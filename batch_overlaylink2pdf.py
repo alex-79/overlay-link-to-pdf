@@ -8,7 +8,6 @@ import mimetypes
 import os, sys
 import io
 import progressbar
-import shutil
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 from reportlab.lib.colors import HexColor
@@ -43,10 +42,10 @@ def make_list_pdfs_by(path, validate, recursive=False):
     return pdfs
 
 def make_overlay_pdf(watermark, position, font, fontsize, color, mediabox, link):
-    lowerLeft = (mediabox.lowerLeft[0].as_numeric(), mediabox.lowerLeft[1].as_numeric())
-    lowerRight = (mediabox.lowerRight[0].as_numeric(), mediabox.lowerRight[1].as_numeric())
-    upperLeft = (mediabox.upperLeft[0].as_numeric(), mediabox.upperLeft[1].as_numeric())
-    upperRight = (mediabox.upperRight[0].as_numeric(), mediabox.upperRight[1].as_numeric())
+    lowerLeft = (mediabox.lower_left[0].as_numeric(), mediabox.lower_left[1].as_numeric())
+    lowerRight = (mediabox.lower_right[0].as_numeric(), mediabox.lower_right[1].as_numeric())
+    upperLeft = (mediabox.upper_left[0].as_numeric(), mediabox.upper_left[1].as_numeric())
+    upperRight = (mediabox.upper_right[0].as_numeric(), mediabox.upper_right[1].as_numeric())
     width_page = lowerRight[0] - lowerLeft[0]
     height_page = upperLeft[1] - lowerLeft[1]
     margin = {'top': 0.5*cm, 'right': 1*cm, 'bottom': 1*cm, 'left': 1*cm} # margin for top right bottom left in cm
@@ -83,7 +82,7 @@ def make_overlay_pdf(watermark, position, font, fontsize, color, mediabox, link)
     canva.linkURL(link, (x, y, x+watermark_width, y+fontsize))
     canva.save()
     packet.seek(0)
-    return PyPDF2.PdfFileReader(packet, strict=False)
+    return PyPDF2.PdfReader(packet, strict=False)
 
 def make_watermark(args):
     watermark = args.watermark
@@ -94,17 +93,17 @@ def make_watermark(args):
     color = args.color
     for filename in make_list_pdfs_by(args.PDFs, args.validate, args.recursive):
         try:
-            existing_pdf = PyPDF2.PdfFileReader(open(filename, "rb"), strict=False)
-            output_pdf = PyPDF2.PdfFileWriter()
-            numPages = existing_pdf.getNumPages()
+            existing_pdf = PyPDF2.PdfReader(open(filename, "rb"), strict=False)
+            output_pdf = PyPDF2.PdfWriter()
+            numPages = len(existing_pdf.pages)
             widgets = [os.path.basename(filename), ': ', progressbar.SimpleProgress()]
             pbar = progressbar.ProgressBar(widgets=widgets, maxval=numPages).start()
             for current_page in range(0, numPages):
                 pbar.update(current_page)
-                page = existing_pdf.getPage(current_page)
-                overlay_pdf = make_overlay_pdf(watermark, position, font, fontsize, color, page.mediaBox, link)
-                page.mergePage(overlay_pdf.getPage(0))
-                output_pdf.addPage(page)
+                page = existing_pdf.pages[current_page]
+                overlay_pdf = make_overlay_pdf(watermark, position, font, fontsize, color, page.mediabox, link)
+                page.merge_page(overlay_pdf.pages[0])
+                output_pdf.add_page(page)
             pbar.finish()
             directory = os.path.dirname(filename).replace(args.PDFs,args.OutPDFs)
             if not os.path.exists(directory):
@@ -112,8 +111,8 @@ def make_watermark(args):
             outputStream = open(os.path.join(directory, args.prefix+os.path.basename(filename)), "wb")
             output_pdf.write(outputStream)
             outputStream.close()
-        except:
-            print(os.path.basename(filename),': ERROR')
+        except Exception as error:
+            print("An exception occurred:", error, 'File:',os.path.basename(filename))
 
 def parse_args():
     parser = argparse.ArgumentParser(usage="%s -w 'My watermark' -l http://my.domain.local [-i ~/docs] [-f DejaVuSans] "
